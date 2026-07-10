@@ -1,163 +1,231 @@
 package org.opencodestudiogame.planarcube.entity;
 
 import org.opencodestudiogame.planarcube.engine.Renderer;
+import org.opencodestudiogame.planarcube.world.World;
 
 /**
  * 玩家实体类
- * 支持在不同空间移动（W/S键）和在当前空间前后移动（A/D键）
+ * 支持在垂直切片之间移动（W/S键）和在当前层内左右移动（A/D键）
  */
 public class Player {
     // 玩家位置
-    private float x, y, z;
+    private float x, y;
+    private int currentLayer = 0;
     
-    // 当前所在空间（面）
-    private int currentSpace = 0;
-    
-    // 玩家尺寸
+    // 物理属性
+    private float velocityY = 0.0f;
+    private boolean isOnGround = false;
     private float width = 1.0f;
     private float height = 2.0f;
     
     // 移动速度
-    private float moveSpeed = 5.0f;
-    private float spaceTransitionSpeed = 2.0f;
+    private float moveSpeed = 8.0f; // 方块/秒
+    private float jumpForce = 12.0f; // 跳跃力度
+    private float gravity = 15.0f; // 重力加速度（方块/秒²）
     
     // 动画状态
     private boolean isMoving = false;
+    private boolean isJumping = false;
     private float animationTime = 0.0f;
     
     // 皮肤相关
     private Skin skin;
     
-    public Player() {
-        this.x = 0.0f;
-        this.y = 0.0f;
-        this.z = 0.0f;
+    // 世界引用（用于碰撞检测）
+    private World world;
+    
+    public Player(World world) {
+        this.world = world;
+        this.x = world.getWorldWidth() / 2.0f; // 初始在中间
+        this.y = world.getGroundHeight((int)x, currentLayer) + 1.0f; // 在地面高度+1
         this.skin = new Skin();
     }
     
-    public Player(float x, float y, float z) {
+    public Player(World world, float x, float y, int layer) {
+        this.world = world;
         this.x = x;
         this.y = y;
-        this.z = z;
+        this.currentLayer = layer;
         this.skin = new Skin();
     }
     
     /**
-     * 在不同空间之间移动
-     * @param direction 方向：1表示向上一个空间，-1表示向下一个空间
+     * 在垂直切片之间移动
+     * @param direction 方向：1表示向前（Z+1），-1表示向后（Z-1）
      */
-    public void moveBetweenSpaces(int direction) {
-        if (direction != 0) {
-            // 在不同空间之间过渡
-            // 这里可以实现空间过渡的动画效果
-            currentSpace += direction;
+    public void moveToLayer(int direction) {
+        if (direction != 0 && world != null) {
+            int targetLayer = currentLayer + direction;
             
-            // 确保空间索引在有效范围内
-            if (currentSpace < 0) currentSpace = 0;
-            if (currentSpace > 5) currentSpace = 5; // 假设有6个面
-            
-            System.out.println("切换到空间: " + currentSpace);
-            
-            // 根据当前空间更新玩家位置
-            updatePositionForSpace();
+            // 确保层索引在有效范围内
+            if (targetLayer >= 0 && targetLayer < world.getWorldDepth()) {
+                // 检查目标层当前位置是否有固体方块
+                int playerX = (int) x;
+                int playerY = (int) y;
+                
+                if (world.isSolid(playerX, playerY, targetLayer)) {
+                    // 如果有固体方块，寻找最近的空位
+                    int newX = findNearestEmptySpace(playerX, playerY, targetLayer);
+                    if (newX != -1) {
+                        x = newX + 0.5f; // 移动到方块中心
+                    } else {
+                        return; // 找不到空位，不移动
+                    }
+                }
+                
+                currentLayer = targetLayer;
+                System.out.println("切换到层: " + currentLayer);
+            }
         }
     }
     
     /**
-     * 在当前空间内移动
-     * @param dx X方向移动量
-     * @param dy Y方向移动量
+     * 在当前层内水平移动
+     * @param direction 方向：1表示向右，-1表示向左
      */
-    public void moveInSpace(float dx, float dy) {
-        // 根据当前空间调整移动方向
-        float[] adjustedMove = adjustMovementForSpace(dx, dy);
-        
-        this.x += adjustedMove[0] * moveSpeed;
-        this.y += adjustedMove[1] * moveSpeed;
-        
-        isMoving = true;
-        animationTime = 0.0f;
-        
-        System.out.println(String.format("玩家移动到: (%.2f, %.2f, %.2f)", x, y, z));
+    public void moveHorizontal(int direction) {
+        if (direction != 0 && world != null) {
+            float targetX = x + direction * moveSpeed * 0.016f; // 假设60FPS
+            
+            // 检查碰撞
+            if (!checkCollision(targetX, y, currentLayer)) {
+                x = targetX;
+                isMoving = true;
+                animationTime = 0.0f;
+                
+                // 更新皮肤动画状态
+                if (skin != null) {
+                    skin.setWalking(true);
+                }
+                
+                System.out.println(String.format("玩家水平移动到: X=%.2f, Y=%.2f, 层=%d", x, y, currentLayer));
+            }
+        }
     }
     
     /**
-     * 根据当前空间调整移动方向
+     * 执行跳跃
      */
-    private float[] adjustMovementForSpace(float dx, float dy) {
-        // 根据当前空间（立方体的面）调整移动方向
-        // 这里简化处理，实际应根据3D坐标变换
-        float[] result = new float[2];
-        
-        switch (currentSpace) {
-            case 0: // 前面
-                result[0] = dx;  // 左右移动
-                result[1] = dy;  // 上下移动
-                break;
-            case 1: // 后面
-                result[0] = -dx; // 反转左右
-                result[1] = dy;
-                break;
-            case 2: // 左面
-                result[0] = -dy; // 上下变为左右
-                result[1] = dx;  // 左右变为上下
-                break;
-            case 3: // 右面
-                result[0] = dy;
-                result[1] = -dx;
-                break;
-            case 4: // 上面
-                result[0] = dx;
-                result[1] = -dy; // 反转上下
-                break;
-            case 5: // 下面
-                result[0] = dx;
-                result[1] = dy;
-                break;
-            default:
-                result[0] = dx;
-                result[1] = dy;
+    public void jump() {
+        if (isOnGround && !isJumping) {
+            velocityY = jumpForce;
+            isOnGround = false;
+            isJumping = true;
+            
+            // 更新皮肤动画状态
+            if (skin != null) {
+                skin.setJumping(true);
+            }
+            
+            System.out.println("玩家跳跃");
         }
-        
-        return result;
     }
     
     /**
-     * 根据当前空间更新玩家位置
+     * 检查碰撞
      */
-    private void updatePositionForSpace() {
-        // 根据空间索引计算3D位置
-        // 这里简化处理，实际应根据立方体面的坐标计算
-        switch (currentSpace) {
-            case 0: // 前面
-                z = -5.0f;
-                break;
-            case 1: // 后面
-                z = 5.0f;
-                break;
-            case 2: // 左面
-                x = -5.0f;
-                break;
-            case 3: // 右面
-                x = 5.0f;
-                break;
-            case 4: // 上面
-                y = 5.0f;
-                break;
-            case 5: // 下面
-                y = -5.0f;
-                break;
+    private boolean checkCollision(float targetX, float targetY, int layer) {
+        if (world == null) return false;
+        
+        // 检查玩家边界（简化：检查底部中心点）
+        int checkX = (int) targetX;
+        int checkY = (int) targetY;
+        
+        // 检查玩家是否碰到固体方块
+        return world.isSolid(checkX, checkY, layer) || 
+               world.isSolid(checkX, (int)(targetY + height - 0.1f), layer) ||
+               world.isSolid((int)(targetX + width - 0.1f), checkY, layer) ||
+               world.isSolid((int)(targetX + width - 0.1f), (int)(targetY + height - 0.1f), layer);
+    }
+    
+    /**
+     * 寻找最近的空位
+     */
+    private int findNearestEmptySpace(int startX, int startY, int layer) {
+        if (world == null) return -1;
+        
+        int maxSearchRadius = 10;
+        
+        // 从当前位置向外搜索
+        for (int radius = 1; radius <= maxSearchRadius; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -1; dy <= 1; dy++) { // 只检查上下1格
+                    int checkX = startX + dx;
+                    int checkY = startY + dy;
+                    
+                    if (checkX >= 0 && checkX < world.getWorldWidth() &&
+                        checkY >= 0 && checkY < world.getWorldHeight()) {
+                        
+                        if (!world.isSolid(checkX, checkY, layer) &&
+                            !world.isSolid(checkX, checkY + 1, layer)) {
+                            return checkX;
+                        }
+                    }
+                }
+            }
         }
+        
+        return -1; // 未找到空位
     }
     
     /**
      * 更新玩家状态
      */
     public void update(double deltaTime) {
+        // 应用重力
+        velocityY -= gravity * deltaTime;
+        
+        // 垂直移动
+        float targetY = y + velocityY * deltaTime;
+        
+        // 垂直碰撞检测
+        if (velocityY < 0) { // 下落
+            if (!checkCollision(x, targetY, currentLayer)) {
+                y = targetY;
+                isOnGround = false;
+            } else {
+                // 落地
+                y = (int)targetY + 1.0f; // 站在方块上
+                velocityY = 0.0f;
+                isOnGround = true;
+                isJumping = false;
+                
+                if (skin != null) {
+                    skin.setJumping(false);
+                }
+            }
+        } else { // 上升
+            if (!checkCollision(x, targetY + height - 0.1f, currentLayer)) {
+                y = targetY;
+                isOnGround = false;
+            } else {
+                // 碰到天花板
+                velocityY = 0.0f;
+            }
+        }
+        
+        // 边界检查
+        if (x < 0) x = 0;
+        if (x > world.getWorldWidth() - width) x = world.getWorldWidth() - width;
+        if (y < 0) {
+            y = 0;
+            velocityY = 0.0f;
+            isOnGround = true;
+            isJumping = false;
+        }
+        if (y > world.getWorldHeight() - height) {
+            y = world.getWorldHeight() - height;
+            velocityY = 0.0f;
+        }
+        
+        // 更新动画状态
         if (isMoving) {
             animationTime += deltaTime;
             if (animationTime > 0.5f) { // 动画持续时间
                 isMoving = false;
+                if (skin != null) {
+                    skin.setWalking(false);
+                }
             }
         }
         
@@ -168,14 +236,18 @@ public class Player {
     }
     
     /**
-     * 渲染玩家
+     * 渲染玩家（2D渲染）
      */
     public void render(Renderer renderer) {
-        // 这里应该实现玩家的渲染逻辑
-        // 根据皮肤和动画状态渲染玩家模型
-        
         if (skin != null) {
-            skin.render(renderer, x, y, z, width, height);
+            // 在2D正交投影下渲染玩家
+            // 注意：这里需要将3D坐标转换为2D屏幕坐标
+            // 玩家的Z坐标固定为当前层的深度，渲染在2D平面上
+            float screenX = x; // 直接使用X坐标（会在渲染器中转换为屏幕坐标）
+            float screenY = y; // 直接使用Y坐标
+            
+            // 渲染玩家精灵
+            skin.render(renderer, screenX, screenY, currentLayer, width, height);
         }
     }
     
