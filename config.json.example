@@ -1,0 +1,22 @@
+{
+  "windowWidth": 1280,
+  "windowHeight": 720,
+  "fullscreen": false,
+  "vsync": true,
+  "targetFps": 60,
+  "mouseSensitivity": 1.0,
+  "movementSpeed": 5.0,
+  "jumpStrength": 8.0,
+  "gravity": 20.0,
+  "masterVolume": 1.0,
+  "musicVolume": 0.8,
+  "soundVolume": 1.0,
+  "keyForward": 87,
+  "keyBackward": 83,
+  "keyLeft": 65,
+  "keyRight": 68,
+  "keyJump": 32,
+  "keyToggleSpace": 69,
+  "skinPath": "assets/skins/steve.png",
+  "lastGameMode": "open"
+}
