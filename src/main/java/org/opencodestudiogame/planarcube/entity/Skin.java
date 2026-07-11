@@ -169,21 +169,46 @@ public class Skin {
     }
     
     /**
-     * 渲染皮肤
+     * 渲染皮肤（2D精灵渲染）
      */
-    public void render(Renderer renderer, float x, float y, float z, float width, float height) {
+    public void render(Renderer renderer, float x, float y, int layer, float w, float h) {
         if (!loaded || textureId == -1) return;
-        
-        // 绑定纹理
+
         glBindTexture(GL_TEXTURE_2D, textureId);
-        
-        // 这里应该实现实际的3D模型渲染
-        // 简化：渲染一个带有纹理的立方体
-        
-        // 设置模型矩阵
-        // 实际渲染逻辑需要实现3D模型和着色器
-        
+
+        // 简单的2D四边形渲染（占位：带纹理的矩形）
+        float[] vertices = {
+            x, y,         0, 1, // 左上
+            x + w, y,     1, 1, // 右上
+            x + w, y + h, 1, 0, // 右下
+            x, y + h,     0, 0, // 左下
+        };
+
+        // 暂时使用颜色占位（后续可改为纹理采样）
+        // 渲染一个简单的人形轮廓
+        renderPlayerShape(renderer, x, y, w, h);
+
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    /**
+     * 渲染玩家2D形状（占位矩形）
+     */
+    private void renderPlayerShape(Renderer renderer, float x, float y, float w, float h) {
+        // 简单角色轮廓：头 + 身体 + 腿
+        float headSize = w * 0.8f;
+        float headX = x + (w - headSize) / 2;
+        float headY = y + h - headSize;
+        float bodyWidth = w * 0.5f;
+        float bodyHeight = h * 0.45f;
+        float bodyX = x + (w - bodyWidth) / 2;
+        float bodyY = headY - bodyHeight;
+        float legWidth = w * 0.22f;
+        float legHeight = h * 0.35f;
+
+        // 切换为颜色模式渲染（简单的矩形占位，通过Terrain类似的VAO渲染）
+        // 这里暂时依赖 Renderer 的着色器，通过统一颜色渲染
+        // 实现留待后续完善纹理采样
     }
     
     /**

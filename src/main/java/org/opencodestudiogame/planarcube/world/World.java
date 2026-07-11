@@ -326,14 +326,6 @@ public class World {
      */
     public void update(double deltaTime) {
         // 更新世界逻辑（如生物、物理等）
-        // 目前为空，可以添加更多功能
-    }
-    
-    /**
-     * 渲染世界
-     */
-    public void render(Renderer renderer) {
-        terrain.render(renderer);
     }
     
     /**

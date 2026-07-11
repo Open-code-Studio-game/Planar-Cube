@@ -3,14 +3,56 @@ package org.opencodestudiogame.planarcube.engine;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.stb.STBImage.*;
 
+import org.opencodestudiogame.planarcube.world.BlockType;
+
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * 纹理图集类
- * 管理游戏中的所有纹理
+ * 2D纹理图集类
+ * 管理所有方块的2D纹理区域
  */
 public class TextureAtlas {
+    private int textureId = -1;
+    private int width;
+    private int height;
+    private boolean loaded = false;
+
+    // 每个BlockType对应的纹理区域 (u0, v0, u1, v1)
+    private final Map<BlockType, float[]> textureRegions = new HashMap<>();
+
+    public TextureAtlas() {
+        initDefaultRegions();
+    }
+
+    /**
+     * 初始化默认纹理区域（假设8列1行的图集布局）
+     */
+    private void initDefaultRegions() {
+        int cols = 8;
+        float cellW = 1.0f / cols;
+
+        BlockType[] types = {BlockType.GRASS, BlockType.DIRT, BlockType.STONE,
+                             BlockType.WOOD, BlockType.LEAVES, BlockType.WATER, BlockType.BEDROCK};
+        for (int i = 0; i < types.length; i++) {
+            float u0 = (i + 1) * cellW;
+            float v0 = 0;
+            float u1 = u0 + cellW;
+            float v1 = 1.0f;
+            textureRegions.put(types[i], new float[]{u0, v0, u1, v1});
+        }
+        // AIR占位
+        textureRegions.put(BlockType.AIR, new float[]{0, 0, cellW, 1.0f});
+    }
+
+    /**
+     * 获取某个BlockType的纹理坐标区域
+     */
+    public float[] getTextureRegion(BlockType type) {
+        return textureRegions.getOrDefault(type, new float[]{0, 0, 0.25f, 1.0f});
+    }
     private int textureId = -1;
     private int width;
     private int height;

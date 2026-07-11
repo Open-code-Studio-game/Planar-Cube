@@ -82,4 +82,13 @@ public class GameConfig {
         this.gameMode = gameMode;
         return this;
     }
+    
+    public int getTileSize() { return tileSize; }
+    public GameConfig setTileSize(int tileSize) { this.tileSize = tileSize; return this; }
+    
+    public int getViewWidthTiles() { return viewWidthTiles; }
+    public GameConfig setViewWidthTiles(int viewWidthTiles) { this.viewWidthTiles = viewWidthTiles; return this; }
+    
+    public double getViewHeightTiles() { return viewHeightTiles; }
+    public GameConfig setViewHeightTiles(double viewHeightTiles) { this.viewHeightTiles = viewHeightTiles; return this; }
 }

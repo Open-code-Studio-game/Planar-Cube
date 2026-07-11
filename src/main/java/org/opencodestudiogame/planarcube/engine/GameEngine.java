@@ -2,7 +2,9 @@ package org.opencodestudiogame.planarcube.engine;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL.*;
+import static org.lwjgl.opengl.GL11.*;
 
+import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryUtil;
@@ -10,7 +12,7 @@ import org.opencodestudiogame.planarcube.world.World;
 import org.opencodestudiogame.planarcube.entity.Player;
 
 /**
- * 游戏引擎主类
+ * 游戏引擎主类 - 垂直切片2D平台游戏
  */
 public class GameEngine {
     private final GameConfig config;
@@ -85,35 +87,38 @@ public class GameEngine {
         inputHandler = new InputHandler(window);
         renderer = new Renderer();
         
-        // 初始化世界和玩家
+        // 初始化世界和玩家（先世界后玩家，玩家需要世界引用）
         world = new World(config.getGameMode());
-        player = new Player();
+        player = new Player(world);
+        
+        // 设置2D正交投影
+        // 视口跟随玩家：以玩家X为中心，水平显示 ~40 个方块
+        renderer.setOrthographicProjection(-20, 20, -2.5f, 37.5f, -1, 1);
         
         // 设置输入回调
         setupInputCallbacks();
         
         running = true;
-        System.out.println("游戏引擎初始化完成");
+        System.out.println("2D平台游戏引擎初始化完成");
+        System.out.println("玩家初始位置: X=" + player.getX() + " Y=" + player.getY() + " 层=" + player.getCurrentLayer());
+        System.out.println("操作: WASD移动/切换层, 空格跳跃, ESC退出");
     }
     
     private void setupInputCallbacks() {
         glfwSetKeyCallback(window, (window, key, scancode, action, mods) -> {
             inputHandler.handleKey(key, action);
             
-            // 处理游戏逻辑按键
-            if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+            // 处理游戏逻辑按键（仅按下时触发一次）
+            if (action == GLFW_PRESS) {
                 switch (key) {
                     case GLFW_KEY_W:
-                        player.moveBetweenSpaces(1); // 向上一个空间
+                        player.moveToLayer(1);  // 向前移动到下一层 (Z+1)
                         break;
                     case GLFW_KEY_S:
-                        player.moveBetweenSpaces(-1); // 向下一个空间
+                        player.moveToLayer(-1); // 向后移动到上一层 (Z-1)
                         break;
-                    case GLFW_KEY_A:
-                        player.moveInSpace(-1, 0); // 向左移动
-                        break;
-                    case GLFW_KEY_D:
-                        player.moveInSpace(1, 0); // 向右移动
+                    case GLFW_KEY_SPACE:
+                        player.jump();          // 跳跃
                         break;
                     case GLFW_KEY_ESCAPE:
                         glfwSetWindowShouldClose(window, true);
@@ -125,15 +130,20 @@ public class GameEngine {
     
     private void loop() {
         double lastTime = glfwGetTime();
-        double deltaTime;
         
         while (running && !glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
-            deltaTime = currentTime - lastTime;
+            double deltaTime = currentTime - lastTime;
             lastTime = currentTime;
+            
+            // 限制deltaTime防止跳跃时物理异常
+            if (deltaTime > 0.05) deltaTime = 0.05;
             
             // 处理输入
             glfwPollEvents();
+            
+            // 处理连续按键（A/D左右移动）
+            processContinuousInput(deltaTime);
             
             // 更新游戏逻辑
             update(deltaTime);
@@ -158,26 +168,70 @@ public class GameEngine {
         }
     }
     
+    /**
+     * 处理连续按键输入（A/D水平移动）
+     */
+    private void processContinuousInput(double deltaTime) {
+        if (inputHandler.isKeyDown(GLFW_KEY_A)) {
+            player.moveHorizontal(-1); // 向左移动
+        }
+        if (inputHandler.isKeyDown(GLFW_KEY_D)) {
+            player.moveHorizontal(1);  // 向右移动
+        }
+    }
+    
     private void update(double deltaTime) {
-        // 更新玩家状态
+        // 更新玩家状态（物理、重力、碰撞）
         player.update(deltaTime);
         
         // 更新世界状态
         world.update(deltaTime);
+        
+        // 更新2D摄像机跟随玩家
+        updateCamera();
+    }
+    
+    /**
+     * 更新2D摄像机，跟随玩家
+     */
+    private void updateCamera() {
+        float playerX = player.getX();
+        float playerY = player.getY();
+        
+        // 水平跟随：玩家居中，边界不超出世界范围
+        float halfView = 20.0f;
+        float left = playerX - halfView;
+        float right = playerX + halfView;
+        
+        // 限制摄像机不超出世界边界
+        if (left < 0) {
+            left = 0;
+            right = 2 * halfView;
+        }
+        if (right > world.getWorldWidth()) {
+            right = world.getWorldWidth();
+            left = right - 2 * halfView;
+        }
+        
+        // 垂直：稍微让玩家偏下
+        float bottom = playerY - 5.0f;
+        float top = playerY + 35.0f;
+        
+        renderer.setOrthographicProjection(left, right, bottom, top, -1, 1);
     }
     
     private void render() {
-        // 清除颜色缓冲区
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-        // 开始渲染
+        // 开始渲染（自动清除缓冲区）
         renderer.begin();
         
-        // 渲染世界
-        world.render(renderer);
+        // 计算并上传MVP矩阵
+        Matrix4f mvp = renderer.getMVPMatrix();
+        renderer.uploadMVPMatrix(mvp);
         
-        // 渲染玩家
+        // 渲染当前层的2D截面
+        world.renderLayer(renderer, player.getCurrentLayer());
+        
+        // 渲染玩家精灵
         player.render(renderer);
         
         // 结束渲染
