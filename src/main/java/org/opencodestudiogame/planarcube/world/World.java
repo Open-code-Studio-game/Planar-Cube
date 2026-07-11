@@ -343,6 +343,43 @@ public class World {
         terrain.cleanup();
     }
     
+    /**
+     * 渲染指定Z层的2D截面
+     */
+    public void renderLayer(Renderer renderer, int layerZ) {
+        if (layerZ >= 0 && layerZ < worldDepth) {
+            terrain.renderLayer(renderer, layerZ);
+        }
+    }
+    
+    /**
+     * 检查某个方块是否是固体（用于碰撞检测）
+     */
+    public boolean isSolid(int x, int y, int z) {
+        if (x < 0 || x >= worldWidth || y < 0 || y >= worldHeight || z < 0 || z >= worldDepth) {
+            return true; // 边界外视为固体
+        }
+        
+        BlockType block = terrain.getBlock(x, y, z);
+        return block != BlockType.AIR && block != BlockType.WATER;
+    }
+    
+    /**
+     * 获取某列的地面高度（用于玩家生成）
+     */
+    public int getGroundHeight(int x, int z) {
+        if (x < 0 || x >= worldWidth || z < 0 || z >= worldDepth) {
+            return 0;
+        }
+        
+        for (int y = worldHeight - 1; y >= 0; y--) {
+            if (terrain.getBlock(x, y, z) != BlockType.AIR) {
+                return y;
+            }
+        }
+        return 0;
+    }
+    
     // Getter方法
     public Terrain getTerrain() { return terrain; }
     public int getWorldWidth() { return worldWidth; }

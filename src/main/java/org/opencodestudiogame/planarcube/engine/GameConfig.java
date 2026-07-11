@@ -11,6 +11,11 @@ public class GameConfig {
     private boolean vsync = true;
     private int targetFps = 60;
     private String gameMode = "open"; // open 或 adventure
+
+    // 2D切片设置
+    private int tileSize = 32;          // 每个方块的像素大小（默认32）
+    private int viewWidthTiles = 40;    // 视口水平可见方块数
+    private double viewHeightTiles = 22.5; // 视口垂直可见方块数
     
     public GameConfig() {
     }

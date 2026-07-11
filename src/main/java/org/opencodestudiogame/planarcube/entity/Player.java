@@ -264,25 +264,32 @@ public class Player {
     // Getter 方法
     public float getX() { return x; }
     public float getY() { return y; }
-    public float getZ() { return z; }
-    public int getCurrentSpace() { return currentSpace; }
+    public int getCurrentLayer() { return currentLayer; }
     public float getWidth() { return width; }
     public float getHeight() { return height; }
+    public float getVelocityY() { return velocityY; }
+    public boolean isOnGround() { return isOnGround; }
+    public boolean isJumping() { return isJumping; }
     public Skin getSkin() { return skin; }
     
     // Setter 方法
-    public void setPosition(float x, float y, float z) {
+    public void setPosition(float x, float y, int layer) {
         this.x = x;
         this.y = y;
-        this.z = z;
+        this.currentLayer = layer;
     }
     
-    public void setCurrentSpace(int space) {
-        this.currentSpace = space;
-        updatePositionForSpace();
+    public void setCurrentLayer(int layer) {
+        if (layer >= 0 && layer < world.getWorldDepth()) {
+            this.currentLayer = layer;
+        }
     }
     
     public void setSkin(Skin skin) {
         this.skin = skin;
+    }
+    
+    public void setWorld(World world) {
+        this.world = world;
     }
 }
